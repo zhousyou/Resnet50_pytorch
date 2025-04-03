@@ -83,9 +83,13 @@ class Resnet(nn.Module):
         self.maxpool1 = nn.MaxPool2d(kernel_size=3,stride=2,padding=1)
 
         self.layer1 = self._make_layer(block, 64, layers[0], stride=1)
+        # print("input_channels is :", self.in_channels)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.fc1 = nn.Linear(512 * block.expansion, num_classes)
 
     def _make_layer(self, block, out_channels, blocks, stride = 1):
         downsample = None
@@ -93,12 +97,14 @@ class Resnet(nn.Module):
             downsample = nn.Sequential(
                 nn.Conv2d(in_channels=self.in_channels, 
                           out_channels= out_channels * block.expansion, 
-                          kernel_size=1),
+                          kernel_size=1,
+                          stride=stride),
                 nn.BatchNorm2d(out_channels * block.expansion)
             )
         layers = []
         layers.append(block(self.in_channels, out_channels, stride = stride, downsample=downsample))
         self.in_channels = out_channels*block.expansion
+        # print("input channels is :", self.in_channels)
         for _ in range(1, blocks):
             layers.append(block(self.in_channels, out_channels))
         return nn.Sequential(*layers)
@@ -110,14 +116,18 @@ class Resnet(nn.Module):
         x = self.relu1(x)
         x = self.maxpool1(x)
 
-        x = self.layer1(x)
+        x = self.layer1(x)   #（256，56，56）
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
 
+        x = self.avgpool(x)
+        x = torch.flatten(x,1)
+        x = self.fc1(x)
+
         return x
     
-# model = Resnet(Bottleblock, [3,4,6,3])
-# summary(model,(3,224,224))
-model = Bottleblock(256, 128)
-summary(model, (256, 56,56))
+model = Resnet(Bottleblock, [3,4,6,3])
+summary(model,(3,224,224))
+# model = Bottleblock(256, 128)
+# summary(model, (256, 56,56))
